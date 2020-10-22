@@ -18,6 +18,7 @@ import { addLineWidget } from "./line_widget.js"
 import { copySharedMarkers, detachSharedMarkers, findSharedMarkers, markText } from "./mark_text.js"
 import { normalizeSelection, Range, simpleSelection } from "./selection.js"
 import { extendSelection, extendSelections, setSelection, setSelectionReplaceHistory, setSimpleSelection } from "./selection_updates.js"
+import { signalLater } from "../util/operation_group.js"
 
 let nextDocId = 0
 let Doc = function(text, mode, firstLine, lineSep, direction) {
@@ -57,11 +58,28 @@ Doc.prototype = createObj(BranchChunk.prototype, {
 
   // Non-public interface for adding and removing lines.
   insert: function(at, lines) {
-    let height = 0
-    for (let i = 0; i < lines.length; ++i) height += lines[i].height
-    this.insertInner(at - this.first, lines, height)
+    var height = 0;
+    for (var i = 0; i < lines.length; ++i) { 
+      var obj = {
+        lineno: at + i,
+        change: "insert",
+      }
+      signalLater(this, "linechange", this, obj);
+      height += lines[i].height; 
+    }
+    this.insertInner(at - this.first, lines, height);
   },
-  remove: function(at, n) { this.removeInner(at - this.first, n) },
+  remove: function(at, n) { 
+    for (var i = 0; i < n; ++i) { 
+      var obj = {
+        lineno: at + i,
+        change: "delete",
+      };
+      signalLater(this, "linechange", this, obj);
+    }
+    this.removeInner(at - this.first, n); 
+  },
+
 
   // From here, the methods are part of the public interface. Most
   // are also available from CodeMirror (editor) instances.
